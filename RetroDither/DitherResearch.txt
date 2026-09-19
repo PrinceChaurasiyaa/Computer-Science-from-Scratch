@@ -1,0 +1,72 @@
+
+================================== Medium =======================================
+
+Alright, image dithering. Chances are that you have never heard of it. 
+Although it is not the most catchy subject for a first post on Medium, 
+the name is quite cool and so is the working algorithm.
+
+Dithering is used to create the illusion of ‘color depth’ in images with a limited 
+color palette — a technique also known as color quantization
+
+In other words: we can use dithering to make a picture still look wonderful despite using less colors. This is done by fooling our brains in some sense. To unravel the dazzling trick, it is insightful to have some basic knowledge about how pictures and the standard RGB-color palette. Fun fact: dithered images are often recognized by having small dots or points. Just like Van Gogh’s astonishing Straw Hat!
+
+RGB-color palette
+An image is made up of pixels and each pixel can be represented by a vector with three different values: one value for the intensity of Red, one value for the intensity of Green and one value for the intensity of Blue. Say we have a picture of 480×480 = 230,400 pixels and imagine that the upper left pixel is represented by the vector x₁,₁ = {0, 0, 0}. Now, this single pixel will be black, since all colors are set to lowest intensity. Another pixel, for example the upper right one, might be represented by x₁,₄₈₀ = {1, 0, 0}, resulting in a pixel as red as Rudolph’s nose.
+Using the full color palette gives us 256³ = 16,777,216 different colors: that sounds like a huge overkill, and way too much to be discriminated by the human eye. Furthermore, it makes our image unnecessarily large! Here is such an image (1.2MB)
+
+
+========================== Google ============================================
+
+A dithering algorithm is an image and audio processing technique that adds controlled noise to randomize quantization errors, creating the illusion of a broader color palette or smooth gradients on limited-display devices.
+
+How It Works
+
+Quantization Reduction: 
+Reduces the number of colors or shades (such as turning a 24-bit image into a 16-color or black-and-white file).
+
+Human Visual System: 
+Relies on the human eye to blend tightly packed dots of available colors into intermediate tones and shades.
+
+Banding Prevention: Eliminates harsh visual blocks or abrupt color steps (color banding) across smooth transitions.
+
+Common Types of Dithering Algorithms
+
+Ordered Dithering: Uses a repeating matrix (like a Bayer matrix) to compare pixel values against deterministic thresholds, making calculations fast and independent.
+
+Floyd-Steinberg: A popular error-diffusion algorithm that calculates the difference between a pixel's true value and its reduced value, then spreads that leftover error onto neighboring unquantized pixels.
+
+Random Dithering: Adds completely random noise to the signal or image before reducing colors, which prevents repeating grid patterns but can look overly grainy.
+
+
+============================ David Kopec ==================================
+
+Dithering algorithms purposely introduce noise into an image in a specific 
+way that makes the image appear to have more color depth than it actually 
+does. This trick on the human eye has both practical and artistic applica
+tions.
+
+=========================== CS 116B ====================================================
+
+“Dithering is the process of juxtaposing pixels of two colors to create the illusion that a third color
+is present” 
+
+
+======================= Error diffusion =============================================
+
+Error-diffusion is a digital halftoning technique used to convert continuous-tone images (like grayscale or color photos) into a limited color or binary (black-and-white) palette while preserving the illusion of intermediate shades.
+
+How Error-Diffusion Works
+
+Quantization: The algorithm scans an image pixel by pixel (usually left-to-right, top-to-bottom) and rounds each pixel's value to the nearest available color or brightness level in the target palette (e.g., pure black 0 or pure white 255).
+
+Error Calculation: It computes the difference (the "quantization error") between the original pixel value and the new quantized value.
+
+Error-Diffusion: This error is then distributed (or diffused) onto neighboring, unprocessed pixels using specific fractions or weights, compensating for the adjustment in subsequent steps.
+
+Key Concepts and Algorithms
+
+Floyd-Steinberg Dithering: The most famous error diffusion method. It pushes the residual error of a pixel to four immediate neighbors: 7/16 to the right, 3/16 to the bottom-left, 5/16 straight down, and 1/16 to the bottom-right.
+
+Noise Shaping: Instead of creating harsh periodic patterns like traditional ordered dithering, error diffusion pushes quantization noise into higher spatial frequencies where the human eye is less sensitive, resulting in sharper detail and smoother gradients.
+
+Advanced Variations: Methods like Jarvis, Judice, and Ninke or Stucki expand the error distribution kernel to a larger neighborhood (12 or more pixels) for higher visual quality at a greater computational cost.
