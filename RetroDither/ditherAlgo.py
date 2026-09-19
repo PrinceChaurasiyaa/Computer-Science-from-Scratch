@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 THRESHOLD = 127
 
-"""NamedTuple = A tuple with named fields that is convenient for storing structured data."""
+#NamedTuple = A tuple with named fields that is convenient for storing structured data.#
 
 class Pattern(NamedTuple):
     deltaColumn: int
@@ -41,26 +41,27 @@ def ditherAlgo(image: Image.Image) -> array:
     array('B', ...): Converts that list into a memory-efficient sys array object from Python's built-in array module. 
     The 'B' type code specifies unsigned chars (bytes), meaning each element is an integer restricted to a value between 0 and 255.
     """
+    
     result = array('B', [0] * (image.width * image.height))
 
-    """ =========== in Pillow: image.getpixel((x, y)) ========  """
-    """ =========== x -> Column (horizontal position) & y -> Row (vertical position) ==============="""
+    # =========== in Pillow: image.getpixel((x, y)) ========
+    # =========== x -> Column (horizontal position) & y -> Row (vertical position) ===============#
 
     for y in range(image.height):
         for x in range(image.width):
             oldPixel: float = image.getpixel((x, y))
 
-            """ ======== Quantization Threshold ====== """
+            # ======== Quantization Threshold ====== #
 
             newPixel = 255 if oldPixel > THRESHOLD else 0
             result[y * image.width + x] = newPixel
 
-            """ ========== Error ==========="""
+            # ========== Error ===========#
 
             error = int(oldPixel - newPixel)
 
-            """ ============ Error Diffusion =========="""
-            
+            # ============ Error Diffusion ==========#
+
             errorDiffusion(x, y, error, BILL_ATKINSON)
 
     return result
