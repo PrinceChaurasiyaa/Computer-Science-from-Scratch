@@ -46,8 +46,8 @@ def prepare(data: array, width: int, height: int) -> array:
         bitsArray += whiteWidthBits
 
     remainingHeight = MAX_HIEGHT - height
-    whiteHeightBits = array('B', [0] * (remainingHeight * MAX_WIDTH) // 8)
-    bitsArray += whiteWidthBits
+    whiteHeightBits = array('B', [0] * ((remainingHeight * MAX_WIDTH) // 8))
+    bitsArray += whiteHeightBits
 
     return bitsArray
 
