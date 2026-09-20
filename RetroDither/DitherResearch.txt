@@ -70,3 +70,1048 @@ Floyd-Steinberg Dithering: The most famous error diffusion method. It pushes the
 Noise Shaping: Instead of creating harsh periodic patterns like traditional ordered dithering, error diffusion pushes quantization noise into higher spatial frequencies where the human eye is less sensitive, resulting in sharper detail and smoother gradients.
 
 Advanced Variations: Methods like Jarvis, Judice, and Ninke or Stucki expand the error distribution kernel to a larger neighborhood (12 or more pixels) for higher visual quality at a greater computational cost.
+
+
+
+=================== Steps ==============================
+
+1. Find whether black or white is closer to the gray in the pixel. This 
+will be based on some kind of threshold. For instance, if the grays are 
+stored as 8-bit unsigned integers, there may be 256 shades of gray num
+bered 0 through 255, and our threshold could be 127. Any pixel greater 
+than 127 may be marked as white (255 in this scheme), and any pixel 
+less than or equal to 127 may be marked as black (0).
+
+2. Subtract the difference between the new pixel color and its original 
+color. Imagine the original gray was 204. The difference would be  
+255 – 204 = 51. This is our error.
+
+3. Add one-eighth of the error to six specific pixels close to the original 
+pixel. This is the diffusion step. In this case, 51 // 8 = 6 (we need to do 
+integer division). The pixels adjusted are: one to the right, two to the 
+right, one diagonally down and left, one diagonally down and right, 
+one straight below, and one two below.
+
+
+
+================================ The MacPaint File Format=============================================
+
+
+1. What is MacPaint?
+
+MacPaint was a painting program created by Bill Atkinson and released by Apple in 1984 with the original Macintosh.
+
+It was revolutionary because people could use:
+
+A mouse 🖱️
+A graphical user interface (GUI)
+Tools for drawing and editing images
+
+Before this, computers often required text commands, and graphical interaction was less common.
+
+Why does the book discuss MacPaint?
+
+The book wants you to build a program that can:
+
+Input Image
+     ↓
+Dithering Algorithm
+     ↓
+Black & White Image
+     ↓
+MacPaint File (.mac)
+
+You will learn how to manipulate pixels and write binary file formats.
+
+2. Why was MacPaint limited to black and white?
+
+The original Macintosh had limited hardware capabilities.
+
+MacPaint supported only:
+
+Black = 1
+White = 0
+
+It did not support grayscale or color in its original format.
+
+The image dimensions were fixed:
+
+576 pixels wide X 720 pixels tall
+
+That means:
+
+Width  = 576 pixels
+Height = 720 pixels
+
+Total pixels:
+
+576 X 720 = 414720
+
+So a MacPaint image contains 414,720 pixels.
+
+3. Why does MacPaint use bits instead of regular pixel values?
+
+This is an important connection to your dithering studies.
+
+Normally, a grayscale image uses 8 bits per pixel:
+
+0 → Black
+255 → White
+
+For example:
+
+pixel = 180
+
+This requires 8 bits.
+
+But MacPaint only needs two colors:
+
+Black = 1
+White = 0
+
+A single bit can represent each pixel.
+
+Example
+
+Suppose we have 8 pixels:
+
+Black White Black White White Black Black White
+
+Represented as bits:
+
+1 0 1 0 0 1 1 0
+
+These 8 bits can be packed into one byte.
+
+That saves storage space.
+
+4. What is run-length encoding (RLE)?
+
+The paragraph says MacPaint used a compression technique called run-length encoding.
+
+RLE compresses repeated values.
+
+Example without compression
+
+Suppose the pixel sequence is:
+
+000000001111111100000000
+
+There are many repeated zeros and ones.
+
+Instead of storing every bit individually, we can represent runs:
+
+8 zeros, 8 ones, 8 zeros
+
+Conceptually:
+
+(0, 8), (1, 8), (0, 8)
+
+This means:
+
+8 consecutive zeros
+8 consecutive ones
+8 consecutive zeros
+Why is this useful?
+
+Images often contain repeated pixel patterns, such as large white backgrounds.
+
+RLE can reduce the amount of data needed to store those patterns.
+
+Important: The exact MacPaint RLE format has its own rules. The example above explains the general concept, not the complete MacPaint encoding specification.
+
+5. What is a binary file format?
+
+Your Python program will eventually save the image to a file.
+
+There are two broad types of data representation:
+
+Text data
+
+Example:
+
+Hello World
+
+Stored as characters.
+
+Binary data
+
+Example:
+
+01010101 11110000
+
+Stored as bytes and interpreted according to a file format's rules.
+
+MacPaint files use binary data.
+
+The computer needs to know:
+
+Where the header starts and ends.
+Where the pixel data is stored.
+How the data is compressed.
+How to interpret the bytes.
+
+That's why the book says:
+
+Programming against binary file formats is a matter of carefully following a specification document.
+
+You cannot simply write arbitrary bytes and expect MacPaint to understand them.
+
+6. What is a 512-byte header?
+
+The paragraph says:
+
+A MacPaint file consists of a 512-byte header followed by pixel data compressed using run-length encoding.
+
+Think of a file as:
+
+┌────────────────────────────┐
+│ Header (512 bytes)         │
+├────────────────────────────┤
+│ Compressed pixel data      │
+└────────────────────────────┘
+What is a header?
+
+A header contains information or reserved space that comes before the main file data.
+
+In this format, the header precedes the compressed image data.
+
+You can think of it as:
+
+File = Header + Compressed Image
+
+The header is not the actual image pixels.
+
+It is part of the file structure.
+
+7. What are Mac OS forks?
+
+This is probably the most unfamiliar concept in the paragraph.
+
+The classic Mac operating system stored files using two parts called forks.
+
+1. Data fork
+
+Contains the actual data of the file.
+
+For a MacPaint file, this includes image-related data.
+
+2. Resource fork
+
+Contains additional structured resources, such as information used by applications.
+
+Historically, Macintosh files could use both forks.
+
+Why does this matter?
+
+Modern operating systems, such as Windows and Linux, do not use the classic Macintosh fork system in the same way.
+
+When a classic Mac file is transferred, information from its forks may need special handling.
+
+That's why the book introduces MacBinary.
+
+8. What is MacBinary?
+
+MacBinary is a format used to preserve classic Macintosh file information when transferring files between systems.
+
+The book explains that MacPaint files transferred outside the classic Mac OS should be encoded using MacBinary so their metadata can survive.
+
+Conceptually:
+
+Classic Mac file
+       ↓
+MacBinary encoding
+       ↓
+File transferred to another OS
+
+MacBinary adds a special header and packages information associated with the Macintosh file structure.
+
+Simplified structure
+┌────────────────────────────┐
+│ MacBinary header           │
+├────────────────────────────┤
+│ MacPaint file information  │
+├────────────────────────────┤
+│ MacPaint data              │
+└────────────────────────────┘
+
+This is a conceptual representation. The actual format has specific fields and alignment requirements.
+
+9. What does the book mean by "bitwise operations"?
+
+At the end, the book says you'll use:
+
+Bitwise shifts
+OR operations
+AND operations
+
+These are operations that work directly on binary bits.
+
+Since MacPaint stores pixels as bits, you'll need these techniques.
+
+Let's see a simple example.
+
+Suppose we have 8 pixels
+1 0 1 0 0 1 1 0
+
+We want to pack them into a byte.
+
+The corresponding binary number is:
+
+10100110
+
+In Python:
+
+value = 0b10100110
+
+print(value)
+
+Output:
+
+166
+
+The 0b prefix indicates a binary literal.
+
+Bitwise OR
+a = 0b10000000
+b = 0b00000110
+
+result = a | b
+
+print(bin(result))
+
+Output:
+
+0b10000110
+
+The OR operation combines bits according to the OR rules.
+
+You'll use operations like these to pack image pixels into bytes.
+
+10. How the entire chapter fits together
+
+This is the most important part.
+
+The book is building a complete image-processing pipeline.
+
+Step 1: Read an image
+image = Image.open("input.png")
+
+The input might contain grayscale values from 0 to 255.
+
+Step 2: Apply dithering
+Grayscale image
+       ↓
+Floyd–Steinberg / Atkinson dithering
+       ↓
+Black-and-white pixels
+
+For Atkinson dithering, your earlier code uses:
+
+new_pixel = 255 if old_pixel > THRESHOLD else 0
+
+This converts each pixel to black or white.
+
+Step 3: Store pixels as bits
+
+Example:
+
+Black White Black White
+  1     0     1     0
+
+The pixels are packed into bytes.
+
+Step 4: Compress using RLE
+
+The packed pixel data is encoded according to the MacPaint compression format.
+
+Step 5: Create the MacPaint header
+
+Your program creates the required header information.
+
+Step 6: Create the MacBinary file
+
+The MacPaint file is packaged using MacBinary so it can be transferred while preserving the necessary Macintosh file information.
+
+11. Complete conceptual diagram
+              INPUT IMAGE
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Grayscale pixels   │
+        │ 0 to 255           │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Dithering          │
+        │ Atkinson           │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Black/White pixels │
+        │ 0 or 255           │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Convert to bits    │
+        │ 0 or 1             │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Pack bits into     │
+        │ bytes               │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ Run-Length         │
+        │ Encoding           │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ MacPaint Header    │
+        └────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────┐
+        │ MacBinary         │
+        │ Packaging         │
+        └────────────────────┘
+                   │
+                   ▼
+             MACPAINT FILE
+
+
+
+
+=============================== Bit Map ====================================
+
+A bitmap is a digital image or memory map made of a grid of tiny dots called pixels, 
+where each dot stores specific color information.
+
+
+How Bitmaps Work
+
+Pixels: 
+
+The grid has rows and columns. Every single pixel holds a color value (like red, green, and blue).
+
+Resolution: More pixels mean a sharper picture. If you zoom in too close, the image gets blurry and you see individual squares.
+
+File Types: Common bitmap (raster) formats include JPEG, PNG, GIF, and BMP. Digital photos and scanned images are always bitmaps.
+
+
+Bitmap vs. VectorBitmap: 
+
+Stores color data for every single pixel. Great for photos, but files get very large and lose quality when enlarged.
+
+Vector: Uses math lines and curves instead of a grid. Great for logos, because you can resize them infinitely without losing quality.
+
+
+=========================== Python array =====================================
+
+array('B') is a Python array that stores unsigned 8-bit integers (bytes).
+
+array('B') stores multiple values, and each value uses exactly 1 byte.
+
+from array import array
+
+data = array('B', [10, 20, 255])
+
+print(data.typecode)
+print(data.itemsize)
+
+Output:
+
+B
+1
+typecode → 'B' means unsigned char
+itemsize → 1 byte per element
+
+
+
+====================================  Translating Bytes to bits ===============================
+
+In "L" mode, our Pillow Image is encoded using 1 byte per pixel. However, in 
+a MacPaint bitmap, pixels are encoded with 1 bit per pixel, meaning each 
+byte represents eight pixels. This is a big savings for black and white, and it 
+makes total sense since we only need two values (1 and 0) to represent two 
+colors.
+
+1. Pillow "L" mode
+
+Each pixel uses 1 byte:
+
+[0, 255, 0, 255, 0, 255, 0, 255]
+
+Each value occupies 8 bits:
+
+1 pixel = 1 byte
+2. MacPaint format
+
+Each pixel uses 1 bit:
+
+[0, 1, 0, 1, 0, 1, 0, 1]
+
+ NOTE: 
+
+means converting byte-per-pixel data into bit-per-pixel representation, then storing those packed bits inside bytes.
+
+our first function in macpaint.py is a 
+converter that takes the byte array we got from dither() and converts it into 
+a “bit array”:
+
+Convert an array of bytes where each byte is 0 or 255
+to an array of bits where each byte that is 0 becomes a 1
+and each byte that is 255 becomes a 0
+
+
+
+================================================ Algorithm ====================================================
+
+1. What does dither() produce?
+
+After dithering, your image contains only two pixel values:
+
+data = [255, 0, 255, 0, 0, 255]
+
+Here:
+
+Pixel value	Color
+255	White
+0	Black
+
+But each value occupies one complete byte.
+
+255 → 11111111 (8 bits)
+0   → 00000000 (8 bits)
+
+So the input uses:
+
+1 pixel = 1 byte
+2. What does MacPaint require?
+
+MacPaint uses:
+
+1 pixel = 1 bit
+
+Its convention is reversed:
+
+Pixel	MacPaint bit
+White (255)	0
+Black (0)	1
+
+For example:
+
+Input pixels:
+255  0  255  0  0  255  255  0
+
+MacPaint bits:
+ 0   1   0   1  1    0    0   1
+
+These 8 bits are packed into one byte:
+
+01011001
+
+Important: The output array still stores bytes. Each byte now represents 8 pixels.
+
+3. Understanding bytes_to_bits()
+
+The function processes 8 input pixels at a time.
+
+for byte_index in range(0, len(original), 8):
+
+Suppose:
+
+original = [255, 0, 255, 0, 0, 255, 255, 0]
+
+It processes all 8 pixels.
+
+Step A: Convert each pixel into a MacPaint bit
+
+next_bit = 1 - (original[byte_index + bit_index] & 1)
+
+For 255:
+
+255 & 1 = 1
+1 - 1 = 0  → White
+
+For 0:
+
+0 & 1 = 0
+1 - 0 = 1  → Black
+
+Thus:
+
+255  0  255  0  0  255  255  0
+ ↓   ↓   ↓   ↓  ↓   ↓    ↓   ↓
+ 0   1   0   1  1   0    0   1
+
+Step B: Pack these bits into one byte
+
+next_byte = next_byte | (next_bit << (7 - bit_index))
+
+Result:
+
+01011001
+
+Then:
+
+bits_array.append(next_byte)
+
+The output is:
+
+array('B', [89])
+
+89 is the decimal representation of binary 01011001.
+
+
+
+======================================= Example Explanation =======================================
+
+Example input
+original = [255, 0, 255, 0, 0, 255, 255, 0]
+
+Remember:
+
+Pixel	Meaning	MacPaint bit
+255	White	0
+0	Black	1
+1. First line: Extract and invert the bit
+next_bit = 1 - (original[byte_index + bit_index] & 1)
+
+Let's assume:
+
+byte_index = 0
+bit_index = 0
+Step A: Get the pixel
+original[0 + 0]
+
+Result:
+
+255
+Step B: Apply & 1
+255 & 1
+
+Binary:
+
+255 = 11111111
+  1 = 00000001
+----------------
+     = 00000001  → 1
+Step C: Invert
+next_bit = 1 - 1
+
+Result:
+
+next_bit = 0
+
+So white (255) becomes bit 0.
+
+Try a black pixel
+original[1] = 0
+0 & 1 = 0
+
+Then:
+
+next_bit = 1 - 0
+next_bit = 1
+
+Black (0) becomes bit 1.
+
+Why & 1?
+
+Because the input contains only 0 and 255:
+
+255 & 1 = 1
+0 & 1   = 0
+
+It extracts the lowest bit.
+
+2. Second line: Put the bit in the correct position
+next_byte = next_byte | (next_bit << (7 - bit_index))
+
+This places each bit into an 8-bit byte.
+
+Initially:
+
+next_byte = 0
+
+Binary:
+
+00000000
+Iteration 1
+bit_index = 0
+next_bit = 0
+
+Calculate the shift:
+
+7 - bit_index = 7
+
+Then:
+
+0 << 7 = 00000000
+
+Combine:
+
+00000000 OR 00000000
+= 00000000
+
+Result:
+
+next_byte = 00000000
+Iteration 2
+
+The second pixel is 0, so:
+
+bit_index = 1
+next_bit = 1
+
+Calculate:
+
+1 << (7 - 1)
+1 << 6
+
+Binary:
+
+01000000
+
+Combine with the previous byte:
+
+00000000
+OR 01000000
+-----------
+  01000000
+
+Result:
+
+next_byte = 01000000
+Iteration 3
+
+Third pixel is 255:
+
+bit_index = 2
+next_bit = 0
+0 << (7 - 2)
+0 << 5
+
+Result:
+
+00000000
+
+OR:
+
+01000000
+OR 00000000
+-----------
+  01000000
+Iteration 4
+
+Fourth pixel is 0:
+
+bit_index = 3
+next_bit = 1
+1 << (7 - 3)
+1 << 4
+
+Result:
+
+00010000
+
+Combine:
+
+01000000
+OR 00010000
+-----------
+  01010000
+3. All 8 iterations
+Bit index	Pixel	next_bit	Shift	Resulting byte
+0	255	0	7	00000000
+1	0	1	6	01000000
+2	255	0	5	01000000
+3	0	1	4	01010000
+4	0	1	3	01011000
+5	255	0	2	01011000
+6	255	0	1	01011000
+7	0	1	0	01011001
+
+Final result:
+
+next_byte = 01011001
+
+Decimal equivalent:
+
+89
+Visual summary
+Pixels:
+255  0  255  0  0  255  255  0
+
+Bits:
+ 0   1   0   1  1    0    0   1
+
+Positions:
+ 7   6   5   4  3    2    1   0
+
+Packed byte:
+0   1   0   1  1    0    0   1
+└──────────────────────────────┘
+          01011001
+Remember
+
+First line: Converts a pixel (255 or 0) into a MacPaint bit (0 or 1).
+
+Second line: Moves that bit into its correct position and combines it into the final byte using OR (|).
+
+
+===================================== prepare () =========================================================
+
+
+1. What is the purpose?
+
+MacPaint requires a fixed bitmap size:
+
+MAX_WIDTH = 576
+MAX_HEIGHT = 720
+
+But your input image may be smaller.
+
+For example:
+
+Original image: 8 × 2 pixels
+MacPaint image: 16 × 4 pixels (simplified)
+
+We must:
+
+Convert each row's pixels into packed bytes.
+Add white pixels to the right of each row.
+Add white rows at the bottom.
+2. Start the function
+def prepare(data: array, width: int, height: int) -> array:
+
+Example:
+
+width = 8
+height = 2
+
+Our original image:
+
+Row 0: 255 0 255 0 255 0 255 0
+Row 1: 0 255 0 255 0 255 0 255
+
+Each pixel is one byte before conversion.
+
+3. Create the output array
+bits_array = array('B')
+
+This will hold the final packed bytes, including padding.
+
+Initially:
+
+bits_array = []
+4. Process every row
+for row in range(height):
+
+Since height = 2:
+
+row = 0
+row = 1
+
+We process each row separately because padding must be added after every row.
+
+5. Find the starting position of the row
+image_location = row * width
+First row
+row = 0
+width = 8
+
+image_location = 0 * 8 = 0
+
+The first row begins at index 0.
+
+Second row
+row = 1
+width = 8
+
+image_location = 1 * 8 = 8
+
+The second row begins at index 8.
+
+Why?
+
+The data is stored as a one-dimensional array:
+
+Row 0: indexes 0–7
+Row 1: indexes 8–15
+
+Formula:
+
+Starting index = row × width
+6. Extract and convert the row
+image_bits = bytes_to_bits(
+    data[image_location:(image_location + width)]
+)
+
+For the first row:
+
+data[0:8]
+
+This extracts:
+
+[255, 0, 255, 0, 255, 0, 255, 0]
+
+Then bytes_to_bits() converts the 8 pixels into one packed byte.
+
+Because white becomes 0 and black becomes 1:
+
+Input pixels:  255 0 255 0 255 0 255 0
+MacPaint bits:  0   1 0   1 0   1 0   1
+
+Packed byte:
+
+01010101
+
+Decimal:
+
+85
+
+Therefore:
+
+image_bits = array('B', [85])
+7. Add the converted row
+bits_array += image_bits
+
+Now:
+
+bits_array = [85]
+
+This contains the actual image data for the row.
+
+8. Calculate missing width
+remaining_width = MAX_WIDTH - width
+
+Using our simplified example:
+
+MAX_WIDTH = 16
+width = 8
+
+Therefore:
+
+remaining_width = 16 - 8 = 8 pixels
+
+We need 8 white pixels to complete the row.
+
+9. Create horizontal white padding
+white_width_bits = array(
+    'B',
+    [0] * (remaining_width // 8)
+)
+
+Calculate:
+
+remaining_width // 8
+
+With 8 missing pixels:
+
+8 // 8 = 1 byte
+
+So:
+
+[0] * 1
+
+becomes:
+
+[0]
+
+Why zero?
+
+00000000 = 8 white pixels
+10. Add horizontal padding
+bits_array += white_width_bits
+
+Now the first row contains:
+
+Actual image: 01010101
+Padding:       00000000
+
+Combined:
+
+01010101 00000000
+
+That's 16 pixels.
+
+The same process happens for the second row.
+
+11. Add vertical padding
+
+After processing all original rows:
+
+remaining_height = MAX_HEIGHT - height
+
+In our simplified example:
+
+MAX_HEIGHT = 4
+height = 2
+
+Therefore:
+
+remaining_height = 4 - 2 = 2 rows
+
+We need two additional white rows.
+
+12. Create white rows
+white_height_bits = array(
+    'B',
+    [0] * ((remaining_height * MAX_WIDTH) // 8)
+)
+
+Calculate:
+
+remaining_height × MAX_WIDTH
+= 2 × 16
+= 32 pixels
+
+Convert pixels into bytes:
+
+32 // 8 = 4 bytes
+
+So:
+
+white_height_bits = array('B', [0, 0, 0, 0])
+
+These represent two complete white rows:
+
+Row 3: 00000000 00000000
+Row 4: 00000000 00000000
+13. Add vertical padding and return
+bits_array += white_height_bits
+return bits_array
+
+The final packed image:
+
+Row 0: 01010101 00000000
+Row 1: 10101010 00000000
+Row 2: 00000000 00000000
+Row 3: 00000000 00000000
+Complete flow
+Input image (8 × 2)
+        ↓
+Process row 0
+        ↓
+Convert pixels to packed bytes
+        ↓
+Add white padding to reach width 16
+        ↓
+Process row 1
+        ↓
+Convert pixels to packed bytes
+        ↓
+Add white padding to reach width 16
+        ↓
+Add white rows to reach height 4
+        ↓
+Return packed bitmap
