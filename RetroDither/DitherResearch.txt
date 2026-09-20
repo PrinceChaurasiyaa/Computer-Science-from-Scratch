@@ -1115,3 +1115,1128 @@ Add white padding to reach width 16
 Add white rows to reach height 4
         ↓
 Return packed bitmap
+
+
+
+=====================================  Run-Length Encoding ======================================================
+
+Storing pixels as individual bits rather than bytes saves a significant amount 
+of space, but it’s not enough. When MacPaint launched in 1984, the origi
+nal Macintosh had floppy disks that supported just 400KB of data. There 
+was no hard drive, and a standard configuration had just one floppy drive. 
+Think about how big a MacPaint file would be if it weren’t compressed. The 
+576 pixels in a row take up 576 bits, which is 72 bytes. There are 720 rows, so 
+720 multiplied by 72 bytes is 51,840 bytes. Adding in the 512-byte header, a 
+MacPaint file would be 52,352 bytes with no compression. That would mean 
+a floppy disk couldn’t even store eight MacPaint files!
+To relieve this disk space problem, the MacPaint file format incorporates 
+a simple compression scheme called run-length encoding. In this scheme, 
+instead of repeating the same thing, you say how many times it should repeat. 
+For example, suppose we want to store the string AAAAAABCCCCCABBBB. 
+If each character uses 1 byte, it would be 17 bytes. Would it not be more effi
+cient to say seven As instead of repeating A seven times? Or saying five Cs?
+Suppose we use up to 1 byte before a character to store its number 
+of repetitions. The string could then be encoded as 6AB5CA4B, which is 
+8 bytes. However, there’s a problem with this scheme. Remember, in com
+puter memory these would be raw bytes. How do we know that B is a char
+acter and not a byte indicating a certain number of repetitions of the next 
+
+character? In other words, B would likely be stored in memory using its 
+ASCII/Unicode code, 66. Our program would likely interpret it as indicat
+ing 66 of the next character, not a single letter B.
+We could instead have a scheme where every character is preceded by 
+a number, even single characters. This would change the encoded string 
+to 6A1B5C1A4B. That’s 10 bytes, a 7-byte savings over the original, which 
+is significant.
+This encoding scheme is a form of run-length encoding, but it breaks 
+down pretty quickly: for many strings, it’s actually less efficient than just 
+storing the raw characters. For example, the string ABC would be 1A1B1C. 
+That’s double the size.
+There’s a compromise. You can have an encoding scheme where each 
+number indicates either a repetition or a certain number of literal char
+acters. Then, ABC becomes 3ABC. That’s still longer, but this new scheme 
+may be a good compromise for more complex cases. For instance, the string 
+AAAAABCBCAAAAAA would be 5A4BCBC6A.
+This version is close to the encoding scheme the MacPaint file format 
+uses, but there’s still a problem: How would you know that the 5 means five 
+As, but the 4 means a literal sequence of four characters (BCBC) rather 
+than four Bs? You may say, “Well, you could read ahead two characters and 
+see that C isn’t a number, so the 4 couldn’t mean four Bs,” but even that 
+doesn’t work, because (again) in computer memory, the C is stored as a 
+number. We need another improvement.
+MacPaint eliminates the ambiguity between numbers that indicate lit
+eral runs and numbers that indicate repetition runs by representing both 
+using signed 1-byte integers. A number n between 0 and 127 indicates n + 1 
+literal bytes follow. A number n between –1 and –127 indicates 1 – n repeti
+tions of the following byte. The number –128 isn’t used. This compression 
+scheme is known as PackBits,5 and it was used beyond just MacPaint in sev
+eral other popular file formats.
+A PackBits function was actually built into classic versions of Mac OS. 
+According to Apple’s own technical note on the subject, “typical MacPaint 
+documents compress to about 10K” with PackBits.6 Table 3-3 summarizes 
+the PackBits encoding scheme.
+
+Table 3-3: The PackBits Encoding Scheme (Signed)
+Value of n
+0 to 127–1 to –127–128
+Meaning
+n + 1 literal bytes follow .
+The next byte is repeated 1 – n times .
+Skip .
+We’ll be working with unsigned integers, so it’s convenient to rewrite 
+the table instead of doing conversions on every byte from signed to unsigned 
+(or thinking about two’s complements). Table 3-4 is the encoding scheme 
+with the bytes converted to unsigned integers.
+75
+Retro Image Processing   
+Table 3-4: The PackBits Encoding Scheme (Unsigned)
+Value of n
+0 to 127
+129 to 255
+128
+Meaning
+n + 1 literal bytes follow .
+The next byte is repeated 257 – n times .
+Skip .
+Have you thought of a limitation of this scheme? What if there are more 
+than 128 bytes in a run? Thankfully, we won’t run into this problem when 
+encoding MacPaint files, because they’re encoded one row at a time. A row 
+in MacPaint can only be 576 pixels, stored as 72 bytes. Since 72 is less than 
+128, we don’t need to worry about the limit.
+To check your understanding, try working with an example that Apple 
+provides in Technical Note TN1023. I’ve converted it from hexadecimal to 
+decimal for your convenience in Table 3-5. One row is the unpacked data, 
+and the other row is the packed data. Try to reformulate the packed data 
+from the unpacked data using Table 3-4 as a reference. Then, check your 
+work against the packed data in Table 3-5.
+
+1. Why do we need compression?
+
+MacPaint uses a fixed image size:
+
+Width = 576 pixels
+Height = 720 pixels
+
+Since each pixel uses 1 bit:
+
+576 bits ÷ 8 = 72 bytes per row
+
+Total image data:
+
+72 × 720 = 51,840 bytes
+
+Plus the 512-byte header:
+
+51,840 + 512 = 52,352 bytes
+
+Compression reduces this size, especially when many neighboring pixels are identical.
+
+2. What is Run-Length Encoding (RLE)?
+
+RLE means:
+
+Instead of storing the same value repeatedly, store its value and how many times it repeats.
+
+Without compression
+AAAAAABCCCCCABBBB
+
+Each character takes 1 byte.
+
+With simple RLE
+6A1B5C1A4B
+
+Meaning:
+
+6A → AAAAAA
+1B → B
+5C → CCCCC
+1A → A
+4B → BBBB
+
+This saves space when values repeat frequently.
+
+Problem
+
+How do we know whether 6 means:
+
+Six repetitions?
+Six literal characters?
+
+We need a way to distinguish the two cases.
+
+3. PackBits solves the ambiguity
+
+PackBits uses a control byte before each group.
+
+The control byte tells us whether the following data is:
+
+A literal sequence (different bytes copied directly).
+A repeated sequence (one byte repeated multiple times).
+
+There are two important ranges.
+
+Case A: Literal bytes
+
+Control byte:
+
+0 to 127
+
+The number n means:
+
+Copy the next n + 1 bytes literally.
+Example
+2, A, B, C
+
+Control byte = 2.
+
+Calculate:
+
+2 + 1 = 3 bytes
+
+So copy:
+
+A B C
+Case B: Repeated byte
+
+Control byte:
+
+129 to 255
+
+The number n means:
+
+Repeat the next byte 257 - n times.
+Example
+254, A
+
+Calculate:
+
+257 - 254 = 3
+
+So:
+
+254, A
+
+means:
+
+A A A
+Case C: Skip byte
+
+Control byte:
+
+128
+
+This byte is ignored.
+
+It does not represent a literal sequence or repetition.
+
+4. Why are repetitions represented using 129–255?
+
+The original specification uses signed 8-bit integers:
+
+Signed value	Meaning
+0 to 127	Literal bytes
+-1 to -127	Repeated bytes
+-128	Unused
+
+But your Python program works with unsigned bytes (0–255).
+
+To convert a negative signed byte to unsigned:
+
+Unsigned value = Signed value + 256
+
+Examples:
+
+-1   → 255
+-2   → 254
+-3   → 253
+
+The repetition count is:
+
+1 - signed_value
+
+Using unsigned values:
+
+257 - unsigned_value
+Example
+
+Signed control byte:
+
+-2
+
+Means:
+
+1 - (-2) = 3 repetitions
+
+Unsigned representation:
+
+-2 + 256 = 254
+
+Therefore:
+
+257 - 254 = 3
+
+Both represent the same operation.
+
+5. Understand the example from Table 3-5
+Unpacked data
+170, 170, 170, 128, 0, 42,
+170, 170, 170, 170,
+128, 0, 42,
+34,
+170, 170, 170, 170, 170, 170, 170, 170, 170
+
+Let's divide it into runs.
+
+Run 1
+170, 170, 170
+
+Three repetitions of 170.
+
+Control byte:
+
+254
+
+Because:
+
+257 - 254 = 3
+
+Encoded:
+
+254, 170
+Run 2
+128, 0, 42, 170, 170, 170, 170
+
+The first three values are different, and then 170 repeats four times.
+
+But PackBits can encode the first four bytes as a literal sequence:
+
+128, 0, 42, 170
+
+There are 4 literal bytes.
+
+Control byte:
+
+4 - 1 = 3
+
+Encoded:
+
+3, 128, 0, 42, 170
+
+However, the provided packed example uses:
+
+2, 128, 0, 42
+
+because the four 170 values are encoded separately as a repeated run.
+
+So:
+
+2, 128, 0, 42
+
+means:
+
+3 + 1 = 3 literal bytes
+
+Then:
+
+253, 170
+
+means:
+
+257 - 253 = 4 repetitions of 170
+6. Decode the packed data
+
+Packed:
+
+254, 170,
+2, 128, 0, 42,
+253, 170,
+3, 128, 0, 42,
+34,
+247, 170
+
+Let's decode it.
+
+Packed bytes	Meaning	Output
+254, 170	Repeat 170 3 times	170, 170, 170
+2, 128, 0, 42	Copy 3 literal bytes	128, 0, 42
+253, 170	Repeat 170 4 times	170, 170, 170, 170
+3, 128, 0, 42, 34	Copy 4 literal bytes	128, 0, 42, 34
+247, 170	Repeat 170 10 times	Ten 170s
+
+For the final repetition:
+
+257 - 247 = 10
+7. Important: Why encode one row at a time?
+
+Each MacPaint row contains:
+
+576 pixels ÷ 8 = 72 bytes
+
+PackBits has a maximum literal run of 128 bytes.
+
+Since:
+
+72 < 128
+
+A row can safely be processed without exceeding the literal-run limit.
+
+The encoder resets at the beginning of every row.
+
+8. Overall compression pipeline
+Dithered image
+      ↓
+Convert pixels to packed bytes
+      ↓
+Prepare image to 576 × 720
+      ↓
+Process each row
+      ↓
+Apply PackBits compression
+      ↓
+Add MacPaint header
+      ↓
+Save MacPaint file
+Remember this
+
+PackBits uses a control byte to tell the decoder whether to copy literal bytes or repeat the next byte.
+
+0–127: Copy n + 1 literal bytes.
+129–255: Repeat the next byte 257 - n times.
+128: Skip.
+
+Have you thought of a limitation of this scheme? What if there are more 
+than 128 bytes in a run? Thankfully, we won’t run into this problem when 
+encoding MacPaint files, because they’re encoded one row at a time. A row 
+in MacPaint can only be 576 pixels, stored as 72 bytes. Since 72 is less than 
+128, we don’t need to worry about the limit.
+To check your understanding, try working with an example that Apple 
+provides in Technical Note TN1023. I’ve converted it from hexadecimal to 
+decimal for your convenience in Table 3-5. One row is the unpacked data, 
+and the other row is the packed data. Try to reformulate the packed data 
+from the unpacked data using Table 3-4 as a reference. Then, check your 
+work against the packed data in Table 3-5.
+Table 3-5: A PackBits Example
+Type
+Bytes
+Unpacked
+Packed
+170, 170, 170, 128, 0, 42, 170, 170, 170, 170, 128, 0, 42, 34, 170, 
+170, 170, 170, 170, 170, 170, 170, 170, 170
+254, 170, 2, 128, 0, 42, 253, 170, 3, 128, 0, 42, 34, 247, 170
+
+
+
+============================== Explaination of RLE =============================
+
+What is the purpose?
+def run_length_encode(original_data: array) -> array:
+
+This function compresses MacPaint's packed image bytes using PackBits Run-Length Encoding.
+
+It handles two types of data:
+
+Repeated bytes → compress them.
+Different bytes (literal data) → store them as a group.
+1. Understand the input
+
+Suppose one row contains these packed bytes:
+
+original_data = [170, 170, 170, 128, 0, 42, 170, 170]
+
+We can divide it into:
+
+170, 170, 170          → Repeated bytes
+128, 0, 42             → Literal bytes
+170, 170              → Repeated bytes
+
+The encoder should produce:
+
+254, 170               → Repeat 170 three times
+2, 128, 0, 42          → Copy three literal bytes
+255, 170               → Repeat 170 two times
+
+Now let's understand the code.
+
+2. The take_same() helper function
+def take_same(source: array, start: int) -> int:
+    count = 0
+
+    while (start + count + 1 < len(source)
+           and source[start + count] == source[start + count + 1]):
+        count += 1
+
+    return count + 1 if count > 0 else 0
+Purpose
+
+It checks how many identical bytes occur consecutively, starting from a specific position.
+
+Example
+source = [170, 170, 170, 128]
+start = 0
+
+Visualize:
+
+Index:  0    1    2    3
+Value: 170  170  170  128
+
+The function compares:
+
+source[0] == source[1]  → True
+source[1] == source[2]  → True
+source[2] == source[3]  → False
+
+It finds 3 identical bytes.
+
+take_same(source, 0)
+
+Returns:
+
+3
+Why return 0 sometimes?
+
+If the starting byte has no immediate duplicate:
+
+source = [170, 128, 0]
+take_same(source, 0)
+
+returns:
+
+0
+
+This tells the main function:
+
+There is no repeated run beginning here.
+
+3. Create the output array
+rle_data = array('B')
+
+This stores the compressed result.
+
+Initially:
+
+rle_data = []
+4. Process each row separately
+for line_start in range(0, len(original_data), MAX_WIDTH // 8):
+
+MacPaint's width is:
+
+MAX_WIDTH = 576
+
+Each row contains:
+
+576 // 8 = 72 bytes
+
+Therefore:
+
+MAX_WIDTH // 8
+
+equals 72.
+
+The loop processes:
+
+Bytes 0–71       → Row 1
+Bytes 72–143     → Row 2
+Bytes 144–215    → Row 3
+
+Why row by row? MacPaint's PackBits data is compressed separately for each row.
+
+5. Extract one row
+data = original_data[
+    line_start:(line_start + (MAX_WIDTH // 8))
+]
+
+This extracts 72 bytes from the original data.
+
+For a small example, suppose the row length is 8:
+
+data = [170, 170, 170, 128, 0, 42, 170, 170]
+
+Then:
+
+index = 0
+
+index tracks the current position inside the row.
+
+6. Find repeated or literal bytes
+not_same = 0
+
+This variable counts how many literal bytes we should collect before a repeated run.
+
+Now examine:
+
+while (((same := take_same(data, index + not_same)) == 0)
+       and (index + not_same < len(data))):
+    not_same += 1
+
+This is the most complicated part, so let's simplify it.
+
+Meaning
+
+Starting at the current position, keep moving forward while there is no repeated run.
+
+The following expression:
+
+same := take_same(data, index + not_same)
+
+is called the assignment expression (walrus operator).
+
+It both:
+
+Calls take_same().
+Stores the result in same.
+
+For example:
+
+same := 3
+
+means:
+
+same = 3
+
+while also using 3 in the condition.
+
+7. Example: Literal bytes
+
+Consider:
+
+data = [170, 170, 170, 128, 0, 42]
+
+Initially:
+
+index = 0
+not_same = 0
+At index 0
+take_same(data, 0)
+
+returns:
+
+3
+
+Therefore:
+
+same = 3
+
+The inner loop stops immediately because same == 0 is false.
+
+There are no literal bytes before this repeated run:
+
+not_same = 0
+
+The code then processes the repeated run.
+
+Imagine instead:
+data = [128, 0, 42, 170, 170, 170]
+
+At index 0:
+
+take_same(data, 0) → 0
+
+So:
+
+not_same = 1
+
+At index 1:
+
+take_same(data, 1) → 0
+
+So:
+
+not_same = 2
+
+At index 2:
+
+take_same(data, 2) → 0
+
+So:
+
+not_same = 3
+
+At index 3:
+
+take_same(data, 3) → 3
+
+The loop stops.
+
+Now:
+
+not_same = 3
+same = 3
+
+We have:
+
+Literal bytes: 128, 0, 42
+Repeated bytes: 170, 170, 170
+8. Encode literal bytes
+if not_same > 0:
+    rle_data.append(not_same - 1)
+    rle_data += data[index:index + not_same]
+    index += not_same
+
+Suppose:
+
+not_same = 3
+Add the control byte
+rle_data.append(not_same - 1)
+
+Calculation:
+
+3 - 1 = 2
+
+So 2 means:
+
+Copy the next 3 literal bytes.
+Add the literal bytes
+rle_data += data[index:index + not_same]
+
+This adds:
+
+128, 0, 42
+
+The result becomes:
+
+2, 128, 0, 42
+Move the index
+index += not_same
+
+The index moves forward by 3.
+
+9. Encode repeated bytes
+if same > 0:
+    rle_data.append(257 - same)
+    rle_data.append(data[index])
+    index += same
+
+Suppose:
+
+same = 3
+data[index] = 170
+Add the repetition control byte
+rle_data.append(257 - same)
+
+Calculation:
+
+257 - 3 = 254
+
+So:
+
+254
+
+means:
+
+Repeat the next byte 3 times.
+Add the byte to repeat
+rle_data.append(data[index])
+
+Adds:
+
+170
+
+The result becomes:
+
+254, 170
+Move forward
+index += same
+
+Since same = 3:
+
+index = index + 3
+
+The three repeated bytes have now been processed.
+
+10. Complete example
+
+Input:
+
+data = [128, 0, 42, 170, 170, 170]
+First: Literal run
+128, 0, 42
+
+Three literal bytes:
+
+Control = 3 - 1 = 2
+
+Encoded:
+
+2, 128, 0, 42
+Second: Repeated run
+170, 170, 170
+
+Three repeated bytes:
+
+Control = 257 - 3 = 254
+
+Encoded:
+
+254, 170
+Final output
+[2, 128, 0, 42, 254, 170]
+11. What each variable means
+Variable	Purpose
+original_data	Complete image bytes
+line_start	Beginning of the current row
+data	Current row's bytes
+index	Current position in the row
+not_same	Number of literal bytes
+same	Number of repeated bytes
+rle_data	Compressed output
+Overall algorithm
+Take one row (72 bytes)
+        ↓
+Start at index 0
+        ↓
+Check for repeated bytes
+        ↓
+If repeated:
+    Encode repetition
+        ↓
+Otherwise:
+    Collect literal bytes
+    Encode literal sequence
+        ↓
+Move index forward
+        ↓
+Repeat until row ends
+        ↓
+Process next row
+        ↓
+Return compressed data
+
+
+
+
+=========================================== MacBinary ========================================
+
+1. Why do we need MacBinary?
+
+In modern operating systems, a file is generally one block of data:
+
+myfile.txt
+└── File data
+
+But in classic Mac OS, files could contain two separate parts called forks.
+
+Mac OS File
+├── Data Fork
+└── Resource Fork
+Data Fork
+
+Contains the main content of the file.
+
+For our MacPaint project, it contains:
+
+MacPaint Header + Compressed Bitmap
+Resource Fork
+
+Contains additional resources, such as:
+
+Icons
+Sounds
+Images
+Program resources
+
+Our MacPaint file does not need a resource fork.
+
+2. What problem occurs on other operating systems?
+
+Classic Mac OS stores information differently from Windows and Linux.
+
+When a Mac file is transferred to another operating system, its metadata and forks might be lost or damaged.
+
+Therefore, a special packaging format called MacBinary was created.
+
+MacBinary structure
+MacBinary File
+├── 128-byte MacBinary Header
+├── Data Fork (MacPaint file)
+└── Resource Fork (none in our case)
+
+Think of MacBinary as a container that protects the MacPaint file and its metadata.
+
+3. Why do we need type and creator codes?
+
+Modern systems commonly use file extensions:
+
+picture.png → Open with image viewer
+document.pdf → Open with PDF reader
+
+Classic Mac OS instead used two codes:
+
+Code	Meaning
+Type code	Identifies what kind of file it is
+Creator code	Identifies which application created or opens it
+
+For MacPaint:
+
+Type code:    PNTG
+Creator code: MPNT
+
+Therefore, after the MacBinary file is unpacked on classic Mac OS:
+
+PNTG + MPNT
+       ↓
+   MacPaint
+
+The file can be opened by double-clicking, even without a .macpaint extension.
+
+4. MacBinary header
+
+The MacBinary header is exactly 128 bytes.
+
+MacBinary File
+┌───────────────────────────┐
+│ Header (128 bytes)        │
+├───────────────────────────┤
+│ MacPaint Data Fork        │
+├───────────────────────────┤
+│ Padding (if necessary)    │
+└───────────────────────────┘
+
+The header contains information such as:
+
+Filename
+File type
+Creator application
+Data fork size
+Creation time
+Modification time
+
+Most other header fields are filled with zeroes.
+
+5. Understanding the header table
+
+The table provides three key pieces of information:
+
+Offset	Length	Meaning
+1	1 byte	Filename length
+2	1–63 bytes	Filename
+65	4 bytes	File type
+69	4 bytes	Creator code
+83	4 bytes	Data fork length
+91	4 bytes	Creation time
+95	4 bytes	Modification time
+
+Important: The offsets are traditionally numbered starting at 1, while Python array indexes start at 0.
+
+So:
+
+Table offset 1 → Python index 0
+Table offset 65 → Python index 64
+6. Filename length
+
+The filename can contain up to 63 characters.
+
+Example:
+
+filename = "drawing"
+
+Its length is:
+
+len(filename)  # 7
+
+The header stores:
+
+Position 1: 7
+Position 2: drawing
+
+Conceptually:
+
+Header
+├── 07
+└── drawing
+
+The filename uses MacRoman encoding, which was a character encoding used by classic Mac OS.
+
+7. File type: PNTG
+
+This identifies the file format.
+
+PNTG
+
+It tells classic Mac OS:
+
+This is a MacPaint graphic file.
+
+It occupies exactly 4 bytes:
+
+P → 1 byte
+N → 1 byte
+T → 1 byte
+G → 1 byte
+8. Creator code: MPNT
+
+This identifies the application associated with the file.
+
+MPNT
+
+It tells the operating system:
+
+MacPaint is the application associated with this file.
+
+Both codes are stored as four characters.
+
+Type:    PNTG
+Creator: MPNT
+9. Data fork length
+
+The MacPaint file we created earlier contains:
+
+MacPaint Header + RLE-compressed bitmap
+
+The MacBinary header must record the size of this data fork.
+
+For example:
+
+Data fork length = 52,352 bytes
+
+The value is stored using 4 bytes.
+
+This allows the system to know where the data fork ends.
+
+10. Why big-endian?
+
+A number can be stored in different byte orders.
+
+For example, consider the hexadecimal number:
+
+0x12345678
+Big-endian
+
+Stores the most significant byte first:
+
+12 34 56 78
+Little-endian
+
+Stores the least significant byte first:
+
+78 56 34 12
+
+Classic Mac OS used big-endian processors, so MacBinary expects multibyte numbers in big-endian order.
+
+In Python, you can convert an integer into big-endian bytes using:
+
+number.to_bytes(4, byteorder="big")
+
+Example:
+
+length = 1000
+
+result = length.to_bytes(4, byteorder="big")
+11. Why is padding necessary?
+
+MacBinary files must have a total size that is a multiple of 128 bytes.
+
+Suppose the complete file size is:
+
+Header: 128 bytes
+Data fork: 500 bytes
+
+Total: 628 bytes
+
+628 is not divisible by 128.
+
+The next multiple of 128 is:
+
+640 bytes
+
+Therefore:
+
+Padding = 640 - 628
+        = 12 bytes
+
+The final file becomes:
+
+128-byte header
++ 500-byte data fork
++ 12-byte padding
+= 640 bytes
+
+The padding is generally filled with zeroes.
+
+12. Complete conversion process
+
+Your entire program follows this pipeline:
+
+Original Image
+      ↓
+Dithering
+      ↓
+Black and White Pixels
+      ↓
+Pack 8 Pixels into 1 Byte
+      ↓
+Prepare 576 × 720 Bitmap
+      ↓
+PackBits Compression
+      ↓
+MacPaint File
+      ↓
+Create 128-byte MacBinary Header
+      ↓
+Add MacPaint Data Fork
+      ↓
+Add Padding to Multiple of 128
+      ↓
+Final MacBinary File
+In one sentence
+
+MacBinary wraps your MacPaint data fork inside a 128-byte header containing metadata, then adds padding so the complete file size is divisible by 128 bytes.
+
+
+====================================== BIG-ENDIAN VS. LITTLE-ENDIAN ==========================================================================
+
+
+What order should the bytes representing a piece of data, such as a number, 
+be stored in? This is a much-debated question, with the computer science world 
+split between two camps: big-endian and little-endian .
+Think for a moment about how we represent numbers in everyday life . 
+If you come from a culture that uses the Arabic numeral system, like the 
+English-speaking world, you’re probably used to writing numbers from left 
+to right starting with the digit representing the largest part of the number 
+and decreasing from there . For example, the number 450 starts with the 
+4 representing the hundreds place, then the 5 representing the tens place, 
+and then the 0 representing the ones place . The 4 represents the largest 
+part of the number (400) and comes first . The decision to put the 4 first was 
+made a long time ago and is largely arbitrary . In theory, we could have a 
+numeral system that writes 450 from smallest to largest as 054, but obvi
+ously we don’t .
+The number 450 requires 2 bytes to represent in binary: 00000001 
+and 11000010 . If you know binary, you know that each 1 represents a single 
+power of 2 that, added with the other “on” powers of 2, gives us the final num
+ber . The first byte, 00000001, puts its lone 1 in the 28 place and represents 
+256 . The second byte, 11000010, represents the number 194 because the 1s 
+for 21 (2), 26 (64), and 27 (128) are turned on, and 128 + 64 + 2 = 194 . We 
+have bytes for 256 and 194, and 256 + 194 = 450 .
+Since we write 450 from largest to smallest, you might assume that your 
+computer would similarly store the byte representing the larger portion of 450 
+first, yielding 0000000111000010 when the bytes are put together . This is 
+known as big-endian order, but it’s not how most computers actually work now
+adays . The typical modern computer is built with a microprocessor that uses 
+one of two architectures: x86-64 (Intel, AMD) or ARM64 (Apple, Qualcomm, 
+and so on) . For technical and historical reasons, those architectures store num
+bers in little-endian order, where the byte representing the smallest end of the 
+number comes first . In a little-endian system, the 2-byte number 450 is stored 
+as 1100001000000001 . It’s important to know which system is at play, since 
+interpreting the little-endian 1100001000000001 as if it were in big-endian 
+order would result in a completely different value .
+While little-endian order dominates today’s computer architectures, certain 
+systems, such as those that run on the 68K microprocessor architecture (origi
+nally by Motorola)—including the original Macintosh—store their numbers in 
+big-endian order . Yes, on the original Macintosh, 450 was stored “the right 
+way” as 0000000111000010, but on the computer in front of you it’s prob
+ably stored as 1100001000000001 . Further complicating matters, most data 
+transmitted over the internet is sent in big-endian order . When you’re browsing 
+the web on your x86-64 or ARM64 microprocessor, there’s endian conversion 
+going on in the background
+
+
+
+Putting It All Together
+To write our MacPaint file bundled as a MacBinary file, we need to take our 
+pixel array from dither() and:
+1. Call prepare() to convert it from bytes to bits and pad it with 0s.
+2. Call run_length_encode() to run-length encode the bit array.
+3. Call macbinary_header() to combine the result with a MacBinary  
+header.
+4. Add a 512-byte MacPaint header as well.
+5. Pad the end result with 0s up to a multiple of 128 bytes to follow the 
+MacBinary specification requiring this.
